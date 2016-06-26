@@ -83,7 +83,6 @@ class Player {
             initTurn();
 
         	// ********** Main ********************************************************************************
-            System.err.println("Start Main");
             for (Entity buster: myBusters) {
             	String c;
 //            	System.err.print("buster "+ buster.entityId);
@@ -135,7 +134,6 @@ class Player {
     		return false;
 
     	int distanceToBase = distance(buster, myBase);
-//    	if ( (Math.abs(buster.x - X) <= 1600) && (Math.abs(buster.y - Y) <= 1600) ) {
     	if (distanceToBase <= 1600) {
     		// within range of base
     		System.out.println("RELEASE");
