@@ -1,4 +1,5 @@
 import java.util.*;
+import java.util.logging.Logger;
 import java.io.*;
 import java.math.*;
 
@@ -12,9 +13,12 @@ class Player {
     static int X, Y;
     static Entity myBase, enemyBase;
     static HashMap<Integer, SessionStatus> myBusterStatus = new HashMap<>();
+    static HashMap<Integer, SessionStatus> ghostsSeen = new HashMap<>();
     static final int maxX = 16000;
     static final int maxY = 9000;
     static final int stepSize = 800;
+    static final int viewDistance = 2200;
+    static final int stunDistance = 1760;
 
 
     public static void main(String args[]) {
@@ -51,7 +55,6 @@ class Player {
                 int entityType = in.nextInt(); // the team id if it is a buster, -1 if it is a ghost.
                 int state = in.nextInt(); // For busters: 0=idle, 1=carrying a ghost.
                 int value = in.nextInt(); // For busters: Ghost id being carried. For ghosts: number of busters attempting to trap this ghost.
-                System.err.println("Add id nr: " + entityId);
                 if (entityType == -1)
                         ghosts.add(new Entity(entityId, x, y, entityType, state, value, null));
                 else if (entityType == myTeamId)
@@ -77,12 +80,13 @@ class Player {
             		buster.sessionStatus.printBusterDirection();
             	}
             }
+            initTurn();
 
         	// ********** Main ********************************************************************************
             System.err.println("Start Main");
             for (Entity buster: myBusters) {
             	String c;
-            	System.err.print("buster "+ buster.entityId);
+//            	System.err.print("buster "+ buster.entityId);
             	buster.sessionStatus.printBusterDirection();
             	
             	// if this buster carries a ghost bring it to my base
@@ -97,6 +101,8 @@ class Player {
 //            	System.err.println("Main 3");
             	if (moveToGhost(buster)) continue;
             	
+            	// stun opponent
+            	if (stunEnemy(buster)) continue;
             	// go somewhere
 //            	System.err.println("Main 4");
             	if (goSomewhere(buster)) continue;
@@ -115,6 +121,13 @@ class Player {
         }
     }
 
+    // Init per turn
+    static void initTurn(){
+    	for (Entity e: myBusters){
+    		e.sessionStatus.rechargeStun();
+    	}
+    }
+    
     // true: action performed | false: no action performed
     static boolean bringGhostToBase(Entity buster) {
     	
@@ -158,35 +171,58 @@ class Player {
     }
     
     // true: action performed | false: no action performed
+    static boolean stunEnemy(Entity buster) {
+    	// if recharging buster can't stun
+    	if (buster.sessionStatus.isRecharging())
+    		return false;
+    	for (Entity e: otherBusters) {
+    		// if enemy already stunned, skip
+    		if (e.state == 2)
+    			continue;
+    		if (distance(buster, e) < stunDistance) {
+    			// Stun enemy
+    			cmdSTUN(e.entityId);
+    			return true;
+    		}
+    	}
+    	return false;
+    }
+    
+    // true: action performed | false: no action performed
     static boolean goSomewhere(Entity buster) {
     	// XY defines a predefined direction 
     	if (buster.sessionStatus.direction == "XY")
-    		if (giveMoveCommand(buster)) { return true; }
-    		else
+    		if (giveMoveCommand(buster)) { 
+//    			System.err.println("Direction - XY");
+    			return true;
+    		}
+    		else{
+//    			System.err.println("Direction - Change to RIGHT");
     			buster.sessionStatus.direction = "RIGHT";
+    		}
     	if (buster.sessionStatus.direction == "RIGHT")
-    		if (buster.x <= (maxX - stepSize) ) { 
+    		if (buster.x <= (maxX - viewDistance) ) { 
     			System.out.println("MOVE " + maxX + " " + buster.y);
     			return true;
     		}
     		else
     			buster.sessionStatus.direction = "DOWN";
     	if (buster.sessionStatus.direction == "DOWN")
-        		if (buster.y <= (maxY - stepSize) ) { 
+        		if (buster.y <= (maxY - viewDistance) ) { 
         			System.out.println("MOVE " + buster.x + " " + maxY);
         			return true;
         		}
         		else
         			buster.sessionStatus.direction = "LEFT";
     	if (buster.sessionStatus.direction == "LEFT")
-        		if (buster.x > stepSize) { 
+        		if (buster.x > viewDistance) { 
         			System.out.println("MOVE  0 " + buster.y);
         			return true;
         		}
         		else
         			buster.sessionStatus.direction = "TOP";
     	if (buster.sessionStatus.direction == "TOP")
-        		if (buster.y > stepSize) { 
+        		if (buster.y > viewDistance) { 
         			System.out.println("MOVE " + buster.x + " 0");
         			return true;
         		}
@@ -202,20 +238,28 @@ class Player {
     	int xDirection = Math.abs(pos1.x - pos2.x);
     	int yDirection = Math.abs(pos1.y - pos2.y);
     	int dist = (int) Math.sqrt(xDirection*xDirection + yDirection*yDirection);
-    	System.err.println("distance: " + dist);
+//    	System.err.println("distance: " + dist);
     	return dist;
     }
     
     // true: action performed | false: no action performed
     static boolean giveMoveCommand(Entity buster){
-    	if ( (buster.x != buster.sessionStatus.targetX) && (buster.y != buster.sessionStatus.targetY) // not at target location yet 
-    			&& ((buster.x - buster.sessionStatus.targetX) > stepSize) && ((buster.y - buster.sessionStatus.targetY) > stepSize) ) {// and not within stepSize range of target location
+    	if ( (Math.abs(buster.x - buster.sessionStatus.targetX) > viewDistance) 
+    			&& (Math.abs(buster.y - buster.sessionStatus.targetY) > viewDistance) ) {
+    		// not within stepSize range of target location AND not at target location yet
     		System.out.println("MOVE " + buster.sessionStatus.targetX + " " + buster.sessionStatus.targetY);
     		return true;
     	}
     	return false;
     }
     
+    static void cmdSTUN(int enemyId){
+    	System.out.println("STUN " + enemyId);
+    }
+    
+    static void cmdMOVE(int x, int y) {
+    	System.out.println("MOVE " + x + " " + y);
+    }
 }
 
 class Entity {
@@ -235,7 +279,7 @@ class Entity {
 }
 
 class SessionStatus {
-	int targetX, targetY;
+	int targetX, targetY, stunWaitTime;
 	String direction;
 
 	public SessionStatus(int targetX, int targetY, String direction) {
@@ -247,6 +291,10 @@ class SessionStatus {
 		this.targetY = targetY;
 		this.direction = direction;
 	}
+	
+	void setStunWaitTime(){stunWaitTime = 20;}
+	void rechargeStun(){if (stunWaitTime>0)stunWaitTime--;}
+	boolean isRecharging() {return (stunWaitTime > 0);}
 	
 	void printBusterDirection(){
     	System.err.println("Buster direction - " + direction + " " + targetX + " " + targetY);
