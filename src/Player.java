@@ -92,6 +92,9 @@ class Player {
 //            	System.err.println("Main 1");
             	if (bringGhostToBase(buster)) continue;
             	
+            	// stun opponent
+            	if (stunEnemy(buster)) continue;
+            	
                 // if there is a ghost in range capture it
 //            	System.err.println("Main 2");
             	if (catchGhostIfInRange(buster)) continue;
@@ -100,8 +103,6 @@ class Player {
 //            	System.err.println("Main 3");
             	if (moveToGhost(buster)) continue;
             	
-            	// stun opponent
-            	if (stunEnemy(buster)) continue;
             	// go somewhere
 //            	System.err.println("Main 4");
             	if (goSomewhere(buster)) continue;
@@ -160,6 +161,11 @@ class Player {
     
     // true: action performed | false: no action performed
     static boolean moveToGhost(Entity buster) {
+    	ghosts.sort(new Comparator<Entity>() {
+    		public int compare(Entity a, Entity b) {
+    			return Integer.compare(a.state, b.state);
+    		}
+		});
     	for (Entity ghost: ghosts) {
     		// Buster sees a ghost, move to this ghost
     		System.out.println("MOVE " + ghost.x + " " + ghost.y);
@@ -170,7 +176,7 @@ class Player {
     
     // true: action performed | false: no action performed
     static boolean stunEnemy(Entity buster) {
-    	// if recharging buster can't stun
+    	// if recharging, buster can't stun
     	if (buster.sessionStatus.isRecharging())
     		return false;
     	for (Entity e: otherBusters) {
@@ -180,6 +186,8 @@ class Player {
     		if (distance(buster, e) < stunDistance) {
     			// Stun enemy
     			cmdSTUN(e.entityId);
+    			// set stunned flag on enemy so other busters won't stun it also in the same turn
+    			e.state = 2;
     			return true;
     		}
     	}
