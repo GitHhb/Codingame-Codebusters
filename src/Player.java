@@ -164,7 +164,6 @@ class Player {
     		if (giveMoveCommand(buster)) { return true; }
     		else
     			buster.sessionStatus.direction = "RIGHT";
-    	// move right if possible
     	if (buster.sessionStatus.direction == "RIGHT")
     		if (buster.x <= (maxX - stepSize) ) { 
     			System.out.println("MOVE " + maxX + " " + buster.y);
