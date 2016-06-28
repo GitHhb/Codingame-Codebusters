@@ -13,7 +13,7 @@ class Player {
     static int X, Y;
     static Entity myBase, enemyBase;
     static HashMap<Integer, SessionStatus> myBusterStatus = new HashMap<>();
-    static HashMap<Integer, SessionStatus> ghostsSeen = new HashMap<>();
+    static HashMap<Integer, Entity> ghostsSeen = new HashMap<>();
     static final int maxX = 16000;
     static final int maxY = 9000;
     static final int stepSize = 800;
@@ -55,8 +55,11 @@ class Player {
                 int entityType = in.nextInt(); // the team id if it is a buster, -1 if it is a ghost.
                 int state = in.nextInt(); // For busters: 0=idle, 1=carrying a ghost.
                 int value = in.nextInt(); // For busters: Ghost id being carried. For ghosts: number of busters attempting to trap this ghost.
-                if (entityType == -1)
-                        ghosts.add(new Entity(entityId, x, y, entityType, state, value, null));
+                if (entityType == -1) {
+                        Entity e = new Entity(entityId, x, y, entityType, state, value, null);
+                        ghosts.add(e);
+                    	ghostsSeen.put(entityId, e);
+                }
                 else if (entityType == myTeamId)
                         myBusters.add(new Entity(entityId, x, y, entityType, state, value, myBusterStatus.get(entityId)));
                 else
@@ -123,9 +126,33 @@ class Player {
 
     // Init per turn
     static void initTurn(){
-    	for (Entity e: myBusters){
-    		e.sessionStatus.rechargeStun();
+    	for (Entity buster: myBusters){
+    		buster.sessionStatus.rechargeStun();
+    		// cleanup ghostsSeen => if I can see the ghost && it's not anymore at known position remove from list
+    		for (Integer ghostKey: ghostsSeen.keySet()) {
+    			if (distance(buster, ghostsSeen.get(ghostKey)) < viewDistance)
+    				ghostsSeen.remove(ghostKey);
+    		}
     	}
+    	// add currently seen ghosts to ghostsSeen
+    	for (Entity ghost: ghosts) {
+    		ghostsSeen.put(ghost.entityId, ghost);
+    	}
+    	// ***** Debug info
+    	// Show ghosts remembered
+    	ArrayList<Entity> list = new ArrayList<>(ghostsSeen.values());
+    	list.sort(new Comparator<Entity>(){
+    		@Override
+    		public int compare(Entity o1, Entity o2) {
+    			// TODO Auto-generated method stub
+    			return Integer.compare(o1.state, o2.state);
+    		}
+    	});
+    	for (Entity ghost: list){
+    		debugMsg("SEEN Ghost: " + ghost.entityId + " - " + ghost.state);
+    	}
+
+
     }
     
     // true: action performed | false: no action performed
@@ -153,6 +180,8 @@ class Player {
                 		&& (Math.abs(buster.y - ghost.y) >= 900) && (Math.abs(buster.y - ghost.y) <= 1760) ) { */
             if ( (distanceToGhost >= 900) && (distanceToGhost <= 1760) ) { 
             	System.out.println("BUST " + ghost.entityId);
+            	// ghosts catched => not visible on map anymore
+            	ghostsSeen.remove(ghost.entityId);
             	return true;
             }
         }
@@ -185,7 +214,7 @@ class Player {
     			continue;
     		if (distance(buster, e) < stunDistance) {
     			// Stun enemy
-    			cmdSTUN(e.entityId);
+    			cmdSTUN(e.entityId, "STAY!!!");
     			// set stunned flag on enemy so other busters won't stun it also in the same turn
     			e.state = 2;
     			return true;
@@ -259,13 +288,18 @@ class Player {
     	return false;
     }
     
-    static void cmdSTUN(int enemyId){
-    	System.out.println("STUN " + enemyId);
+    static void cmdSTUN(int enemyId, String msg){
+    	System.out.println("STUN " + enemyId + " " + msg);
     }
     
-    static void cmdMOVE(int x, int y) {
-    	System.out.println("MOVE " + x + " " + y);
+    static void cmdMOVE(int x, int y, String msg) {
+    	System.out.println("MOVE " + x + " " + y + " " + msg);
     }
+    
+    static void debugMsg(String msg) {
+    	System.err.println(msg);
+    }
+
 }
 
 class Entity {
